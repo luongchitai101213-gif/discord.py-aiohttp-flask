@@ -256,7 +256,6 @@ async def getbot_cmd(ctx):
 # ================== SLASH: HELP & DEBUG & LIST SV ==================
 @tree.command(name="help", description="📖 Danh sách lệnh")
 async def help_cmd(interaction: discord.Interaction):
-    # Đã thêm defer để tránh lỗi "Ứng dụng không phản hồi"
     await interaction.response.defer(ephemeral=True)
     
     e = discord.Embed(title=f"📖 HƯỚNG DẪN SỬ DỤNG {BOT_NAME.upper()}", color=0x5865F2)
@@ -267,7 +266,6 @@ async def help_cmd(interaction: discord.Interaction):
     e.add_field(name="👑 **QUẢN LÝ** _(Owner)_", value="`/vip add|remove|list` — Quản lý VIP có thời hạn\n`/listsv` — Danh sách server hỗ trợ\n`/debug` — Gửi báo cáo về DM Owner\n`/notice` | `/unnotice` — Thông báo", inline=False)
     e.set_footer(text="Gõ !getbot để nhận link mời Bot qua DM.")
     
-    # Dùng followup.send
     await interaction.followup.send(embed=e, ephemeral=True)
 
 @tree.command(name="debug", description="🛠️ Gửi thông tin hệ thống của Bot về DM Owner")
@@ -788,11 +786,9 @@ async def guard_cmd(interaction: discord.Interaction):
     if not is_admin(interaction.user): 
         return await interaction.response.send_message("❌ Bạn không có quyền truy cập hệ thống.", ephemeral=True)
     
-    # Đã thêm defer để tránh lỗi "Ứng dụng không phản hồi"
     await interaction.response.defer(ephemeral=True)
     
     v = GuardView(interaction.guild_id)
-    # Dùng followup.send
     await interaction.followup.send(embed=v.create_embed(), view=v)
 
 # ================== HỆ THỐNG ANTI ==================
@@ -1006,18 +1002,14 @@ async def on_member_join(member: discord.Member):
 async def on_ready():
     print(f"✅ Đã đăng nhập: {bot.user} | Owner: {OWNER_ID}")
     
-    # Chạy các tác vụ nền
     if not anti_nuke_scanner.is_running(): anti_nuke_scanner.start()
     if not check_vip_expired.is_running(): check_vip_expired.start()
     
-    # Tạo kênh log cho tất cả server (có thể bỏ qua nếu muốn nhẹ hơn)
     for g in bot.guilds:
-        try:
-            await ensure_log_channel(g)
-        except:
-            pass
+        try: await ensure_log_channel(g)
+        except: pass
 
-    # Đồng bộ slash command trong background, có xử lý lỗi 429
+    # Đồng bộ lệnh Slash trong background để tránh lỗi 429
     async def sync_commands():
         try:
             await tree.sync()
@@ -1035,5 +1027,8 @@ async def on_ready():
             else:
                 print(f"❌ Lỗi khi sync lệnh: {e}")
 
-    # Chạy sync trong background để không block on_ready
     asyncio.create_task(sync_commands())
+
+# ================== KHỞI CHẠY ==================
+keep_alive()
+bot.run(TOKEN)
