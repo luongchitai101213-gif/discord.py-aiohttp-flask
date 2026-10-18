@@ -15,7 +15,6 @@ def home():
     return "Bot LieuNhuyen dang chay 24/7!"
 
 def run_web():
-    # Render sẽ tự cấp PORT, nếu chạy local thì dùng 8080
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -25,7 +24,6 @@ def keep_alive():
 # ======================================================
 
 # ============ CẤU HÌNH ============
-# Lấy TOKEN từ biến môi trường trên Render, nếu không có thì dùng chuỗi dưới
 TOKEN = os.getenv("TOKEN", "DÁN_TOKEN_BOT_VÀO_ĐÂY")          
 OWNER_ID = 1371529206470803466            
 BOT_NAME = "LieuNhuyen"
@@ -258,6 +256,9 @@ async def getbot_cmd(ctx):
 # ================== SLASH: HELP & DEBUG & LIST SV ==================
 @tree.command(name="help", description="📖 Danh sách lệnh")
 async def help_cmd(interaction: discord.Interaction):
+    # Đã thêm defer để tránh lỗi "Ứng dụng không phản hồi"
+    await interaction.response.defer(ephemeral=True)
+    
     e = discord.Embed(title=f"📖 HƯỚNG DẪN SỬ DỤNG {BOT_NAME.upper()}", color=0x5865F2)
     e.add_field(name="🛡️ **GUARD** _(Admin)_", value="`/guard` — Bảng bảo vệ\n`/whitelist add|remove|list` — Miễn nhiễm\n`/mute`, `/unmute`, `/kick`, `/ban`, `/unban`", inline=False)
     e.add_field(name="⚠️ **CẢNH CÁO** _(Admin)_", value="`/warn` — Cảnh cáo (2 lần = Mute 5p)\n`/warns` — Xem cảnh cáo\n`/clearwarns` — Xóa cảnh cáo", inline=False)
@@ -265,7 +266,9 @@ async def help_cmd(interaction: discord.Interaction):
     e.add_field(name="💾 **BACKUP** _(VIP/Owner)_", value="`/backup` — Lưu server\n`/restore` — Khôi phục (Miễn phí)\n`/getfree` — Dùng 1 lần (Free)", inline=False)
     e.add_field(name="👑 **QUẢN LÝ** _(Owner)_", value="`/vip add|remove|list` — Quản lý VIP có thời hạn\n`/listsv` — Danh sách server hỗ trợ\n`/debug` — Gửi báo cáo về DM Owner\n`/notice` | `/unnotice` — Thông báo", inline=False)
     e.set_footer(text="Gõ !getbot để nhận link mời Bot qua DM.")
-    await interaction.response.send_message(embed=e, ephemeral=True)
+    
+    # Dùng followup.send
+    await interaction.followup.send(embed=e, ephemeral=True)
 
 @tree.command(name="debug", description="🛠️ Gửi thông tin hệ thống của Bot về DM Owner")
 async def debug_cmd(interaction: discord.Interaction):
@@ -759,16 +762,23 @@ class GuardView(discord.ui.View):
             description="Dưới đây là danh sách các module bảo vệ. Bấm vào nút tương ứng để **Bật / Tắt**.\n\u200b",
             color=0x2ecc71 if any(guard_data.values()) else 0xFF0000
         )
+        
         col1, col2 = [], []
         for key, (icon, name) in GUARD_INFO.items():
             is_on = guard_data.get(key, False)
-            status = "🟢 `ON`" if is_on else "🔴 `OFF`"
+            status = "🟢" if is_on else "🔴"
             col1.append(f"{icon} **{name}**")
             col2.append(status)
+            
         table = ""
         for i in range(len(col1)):
-            table += f"{col1[i]:<16} | {col2[i]}\n"
-        e.add_field(name="📋 DANH SÁCH MODULE", value=f"```ini\n{table}\n```", inline=False)
+            table += f"{col1[i]:<18} | {col2[i]}\n"
+            
+        # Chia thành 2 field để tránh vượt quá 1024 ký tự
+        half = len(table) // 2
+        e.add_field(name="📋 DANH SÁCH MODULE (1/2)", value=f"```ini\n{table[:half]}\n```", inline=False)
+        e.add_field(name="📋 DANH SÁCH MODULE (2/2)", value=f"```ini\n{table[half:]}\n```", inline=False)
+        
         e.set_footer(text="Hệ thống bảo mật tự động | Yêu cầu quyền Admin")
         e.timestamp = discord.utils.utcnow()
         return e
@@ -777,8 +787,13 @@ class GuardView(discord.ui.View):
 async def guard_cmd(interaction: discord.Interaction):
     if not is_admin(interaction.user): 
         return await interaction.response.send_message("❌ Bạn không có quyền truy cập hệ thống.", ephemeral=True)
+    
+    # Đã thêm defer để tránh lỗi "Ứng dụng không phản hồi"
+    await interaction.response.defer(ephemeral=True)
+    
     v = GuardView(interaction.guild_id)
-    await interaction.response.send_message(embed=v.create_embed(), view=v)
+    # Dùng followup.send
+    await interaction.followup.send(embed=v.create_embed(), view=v)
 
 # ================== HỆ THỐNG ANTI ==================
 @bot.event
