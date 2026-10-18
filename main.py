@@ -1004,16 +1004,36 @@ async def on_member_join(member: discord.Member):
 # ================== READY ==================
 @bot.event
 async def on_ready():
-    await download_gif()
-    await tree.sync()
-    for g in bot.guilds: await ensure_log_channel(g)
+    print(f"✅ Đã đăng nhập: {bot.user} | Owner: {OWNER_ID}")
+    
+    # Chạy các tác vụ nền
     if not anti_nuke_scanner.is_running(): anti_nuke_scanner.start()
     if not check_vip_expired.is_running(): check_vip_expired.start()
-    print(f"✅ Đã đăng nhập: {bot.user} | Owner: {OWNER_ID}")
+    
+    # Tạo kênh log cho tất cả server (có thể bỏ qua nếu muốn nhẹ hơn)
+    for g in bot.guilds:
+        try:
+            await ensure_log_channel(g)
+        except:
+            pass
 
-# ================== KHỞI CHẠY ==================
-# Bật web server Flask để Render không cho bot đi ngủ
-keep_alive()
+    # Đồng bộ slash command trong background, có xử lý lỗi 429
+    async def sync_commands():
+        try:
+            await tree.sync()
+            print("✅ Đã đồng bộ lệnh Slash thành công!")
+        except discord.HTTPException as e:
+            if e.status == 429:
+                retry_after = e.response.headers.get('Retry-After', 60)
+                print(f"⚠️ Bị rate limit khi sync lệnh, chờ {retry_after} giây...")
+                await asyncio.sleep(float(retry_after) + 5)
+                try:
+                    await tree.sync()
+                    print("✅ Đã đồng bộ lệnh Slash thành công sau khi chờ!")
+                except Exception as e2:
+                    print(f"❌ Vẫn không thể sync lệnh: {e2}")
+            else:
+                print(f"❌ Lỗi khi sync lệnh: {e}")
 
-# Chạy bot
-bot.run(TOKEN)
+    # Chạy sync trong background để không block on_ready
+    asyncio.create_task(sync_commands())
